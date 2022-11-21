@@ -22,10 +22,10 @@ jobs:
     ##############################################
 
     - name: Compile tests
-      run: sbt "+test:compile"
+      run: mill __.test.compile
 
     - name: Run tests
-      run: sbt "++2.11.12; testWithoutFormal"
+      run: mill __.test
 
   formal:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
     ##############################################
 
     - name: Run tests
-      run: sbt "++2.11.12; testFormal"
+      run: mill resolve _
 
   scaladoc:
     runs-on: ubuntu-latest
