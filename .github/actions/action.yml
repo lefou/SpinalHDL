@@ -25,12 +25,10 @@ runs:
           ~/.sbt
         key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
 
-    - name: Cache Mill
-      uses: actions/cache@v3
+    - name: Install Mill
+      uses: jodersky/setup-mill@master
       with:
-        path: |
-          ~/.ivy2/cache
-        key: ${{ runner.os }}-mill-${{ hashFiles('**/build.sc') }}
+        mill-version: 0.10.9
 
     ##############################################
 
