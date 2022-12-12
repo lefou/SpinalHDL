@@ -28,8 +28,8 @@ install_ghdl(){
 
 install_iverilog(){
   sudo apt install -y gperf readline-common bison flex libfl-dev
-  curl -fsSL https://github.com/steveicarus/iverilog/archive/v10_3.tar.gz | tar -xvz
-  cd iverilog-10_3
+  curl -fsSL https://github.com/steveicarus/iverilog/archive/v11_0.tar.gz | tar -xvz
+  cd iverilog-11_0
   autoconf
   ./configure  --prefix ~/tools
   make -j$(nproc)
