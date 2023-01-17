@@ -8,14 +8,14 @@ import spinal.lib.sim.{StreamDriver, StreamMonitor, StreamReadyRandomizer}
 
 import scala.collection.mutable
 
-case class AxiLite4Driver(axi : AxiLite4, clockDomain : ClockDomain) {
+case class AxiLite4Driver(axi : AxiLite4, clockDomain : ClockDomain) {  
+  val bRandomizer = StreamReadyRandomizer(axi.b, clockDomain)
 
   def reset() : Unit = {
     axi.aw.valid #= false
     axi.w.valid #= false
     axi.ar.valid #= false
     axi.r.ready #= true
-    axi.b.ready #= true
   }
 
   def read(address : BigInt) : BigInt = {
