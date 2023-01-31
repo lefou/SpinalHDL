@@ -56,7 +56,7 @@ case class AxiLite4BusInterface(bus: AxiLite4, sizeMap: SizeMapping, regPre: Str
   val doRead    = axiAr.valid && axiAr.ready
   val writeData = axiW.payload.data
 
-  axiRValid := doRead
+  axiRValid setWhen(doRead) clearWhen(axiR.ready)
   axiBValid := doWrite
 
   def readAddress()  = if(withStrb) U(axiAr.addr.drop(underbitWidth) ## B(0, underbitWidth bit)) else axiAr.addr
