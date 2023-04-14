@@ -28,7 +28,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get image name
-        run: echo "IMAGE_NAME=${{ github.repository | lower }}" >> $GITHUB_ENV
+        run: echo "IMAGE_NAME=${{ github.repository,,}}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
