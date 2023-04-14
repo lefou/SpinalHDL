@@ -114,4 +114,13 @@ RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \
     cd SpinalHDL && \
     sbt compile
 
+RUN DEBIAN_FRONTEND=noninteractive apt purge -y \
+    pkg-config \
+    clang \
+    tcl-dev \
+    libreadline-dev \
+    flex \
+    bison \
+    && apt autoremove -y && apt clean
+
 CMD ["bash"]
