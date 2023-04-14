@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -28,11 +28,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get image name
-        run: echo "IMAGE_NAME=${{ github.repository,,}}" >> $GITHUB_ENV
+        run: echo "LOW_IMAGE_NAME=${IMAGE_NAME,,}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ env.LOW_IMAGE_NAME }}:latest
