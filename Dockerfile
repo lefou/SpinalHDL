@@ -77,6 +77,7 @@ RUN git clone https://github.com/YosysHQ/SymbiYosys.git SymbiYosys && \
     make install && \
     cd .. && rm -rf SymbiYosys 
 
+RUN mkdir solver && cd solver
 RUN curl -o solvers.zip -sL "https://github.com/GaloisInc/what4-solvers/releases/download/snapshot-20221212/ubuntu-22.04-bin.zip"
 RUN unzip solvers.zip && \
     rm solvers.zip && \
@@ -85,7 +86,8 @@ RUN unzip solvers.zip && \
     cp cvc5 /usr/local/bin/cvc5 && \
     cp z3 /usr/local/bin/z3 && \
     cp yices /usr/local/bin/yices && \
-    cp yices-smt2 /usr/local/bin/yices-smt2
+    cp yices-smt2 /usr/local/bin/yices-smt2 && \
+    cd .. && rm -rf solver
 
 # Add repos and install sbt 
 RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
@@ -112,10 +114,4 @@ RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \
     cd SpinalHDL && \
     sbt compile
 
-# Copy downloaded stuff to SPINAL folder
-#COPY $SPINAL_DIR /SPINAL
-
 CMD ["bash"]
-#ENTRYPOINT [ "/usr/bin/bash" ]
-#ADD entrypoint.sh /
-#ENTRYPOINT ["/entrypoint.sh"]
