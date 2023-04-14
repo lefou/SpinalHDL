@@ -5,11 +5,7 @@
 
 FROM ubuntu:22.04
 
-ARG USER=user
-ARG UID=1000
-ARG GID=1000
-ARG PASS=password
-ARG SPINAL_DIR=SPINAL
+ARG SPINAL_DIR=/data
 
 # Install tools and other stuff
 RUN apt update && apt upgrade -y && \
@@ -98,19 +94,12 @@ RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E4
         | tee /etc/apt/sources.list.d/sbt_old.list \
     && apt update && apt install sbt
 
-# Add user into the system
-RUN groupadd --gid $GID $USER && \
-    useradd --uid $UID --gid $GID --groups sudo --shell /bin/bash -m $USER && \
-    echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/admins && \
-    echo "$USER:$PASS" | chpasswd
-
-
-WORKDIR /home/user
+WORKDIR $SPINAL_DIR
 
 ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
 ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
 RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
-    git config --global safe.directory /home/user/SpinalHDL && \
+    git config --global safe.directory $SPINAL_DIR/SpinalHDL && \
     cd SpinalHDL && \
     sbt compile
 
