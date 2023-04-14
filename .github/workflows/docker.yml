@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - '*'
 
 env:
   REGISTRY: ghcr.io
@@ -30,9 +32,13 @@ jobs:
       - name: Get image name
         run: echo "LOW_IMAGE_NAME=${IMAGE_NAME,,}" >> $GITHUB_ENV
 
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.LOW_IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ env.LOW_IMAGE_NAME }}:${{ steps.get_version.outputs.VERSION }}
