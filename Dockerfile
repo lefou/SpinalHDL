@@ -99,8 +99,8 @@ WORKDIR $SPINAL_DIR
 ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
 ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
 RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
-    git config --global safe.directory $SPINAL_DIR/SpinalHDL && \
     cd SpinalHDL && \
+    git submodule update --init --recursive && \
     sbt compile
 
 RUN DEBIAN_FRONTEND=noninteractive apt purge -y \
