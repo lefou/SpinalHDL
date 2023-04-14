@@ -966,7 +966,7 @@ class PhaseMemBlackBoxingDefault(policy: MemBlackboxingPolicy) extends PhaseMemB
       mem.component.rework {
         val port = topo.readWriteSync.head
 
-        val ram = new Ram_1wrs(
+        val ram = port.clockDomain on new Ram_1wrs(
           wordWidth = port.width,
           wordCount = mem.wordCount*mem.width/port.width,
           technology = mem.technology,
@@ -1441,7 +1441,7 @@ class PhaseInferWidth(pc: PhaseContext) extends PhaseMisc{
             if (e.getWidth < 0) {
               errors += s"Negative width on $e at ${e.getScalaLocationLong}"
             }
-            if (e.getWidth > 4096) {
+            if (e.getWidth > pc.config.bitVectorWidthMax) {
               errors += s"Way too big signal $e at ${e.getScalaLocationLong}"
             }
           case _ =>
@@ -2659,6 +2659,35 @@ class PhaseFillRegsInit() extends Phase{
   override def hasNetlistImpact: Boolean = true
 }
 
+
+class PhaseCheckAsyncResetsSources() extends PhaseCheck {
+  override def impl(pc: PhaseContext): Unit = {
+    val cds = new mutable.LinkedHashSet[ClockDomain]()
+    pc.walkDeclarations{
+      case bt : BaseType if bt.isReg && bt.clockDomain.reset != null && bt.clockDomain.config.resetKind == ASYNC => {
+        if(bt.component.getClass.getSimpleName != "BufferCC") {
+          cds += bt.clockDomain
+        }
+      }
+      case _ =>
+    }
+
+    for(cd <- cds){
+      cd.reset.getDrivingReg(false) match {
+        case null => {
+          println(s"Can't find driver of ${cd.reset}")
+        }
+        case driver => {
+          println(s"${cd.reset} reset for clock ${cd.clock} is clocked by ${driver.clockDomain.clock}")
+          println(s"- FF : ${driver}")
+          if(driver.clockDomain.clock != cd.clock){
+            println(s"- Mismatch clock !!")
+          }
+        }
+      }
+    }
+  }
+}
 
 object SpinalVhdlBoot{
   def apply[T <: Component](config : SpinalConfig)(gen : => T) : SpinalReport[T] ={
