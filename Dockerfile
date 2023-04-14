@@ -14,6 +14,7 @@ ARG SPINAL_DIR=SPINAL
 # Install tools and other stuff
 RUN apt update && apt upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt install -y \
+    autoconf \
     build-essential \
     curl \
     git \
@@ -25,7 +26,6 @@ RUN apt update && apt upgrade -y && \
     software-properties-common \
     sudo \
     tzdata \
-    verilator \
     ghdl \
     iverilog \
     xauth \
@@ -40,11 +40,32 @@ RUN DEBIAN_FRONTEND=noninteractive apt install -y \
     bison \
     && apt clean
 
-RUN mkdir -p /home/solvers
-WORKDIR /home/solvers
+RUN DEBIAN_FRONTEND=noninteractive apt install -y \
+    python3 \
+    python3-pip \
+    python3-pip-whl \
+    && apt clean
+RUN pip install cocotb cocotb-test click
+
+ARG VERILATOR_VERSION=v4.228
+ARG YOSYS_VERSION=master
+ARG SYMBIYOSYS_VERSION=master
+
+WORKDIR /tmp
+
+RUN git clone "https://github.com/verilator/verilator" verilator && \
+    cd verilator && \
+    git checkout "${VERILATOR_VERSION}" && \
+    autoconf && \
+    ./configure && \
+    make -j "$(nproc)" && \
+    make install && \
+    cd .. && \
+    rm -r verilator
 
 RUN git clone https://github.com/YosysHQ/yosys.git yosys && \
     cd yosys && \
+    git checkout "${YOSYS_VERSION}" && \
     make -j$(nproc) && \
     make install && \
     cd .. && rm -rf yosys 
@@ -52,6 +73,7 @@ RUN git clone https://github.com/YosysHQ/yosys.git yosys && \
 # Install Symbiyosys
 RUN git clone https://github.com/YosysHQ/SymbiYosys.git SymbiYosys && \
     cd SymbiYosys && \
+    git checkout "${SYMBIYOSYS_VERSION}" && \
     make install && \
     cd .. && rm -rf SymbiYosys 
 
@@ -81,9 +103,19 @@ RUN groupadd --gid $GID $USER && \
     echo "$USER:$PASS" | chpasswd
 
 
+WORKDIR /home/user
+
+ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
+ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
+RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
+    git config --global safe.directory /home/user/SpinalHDL && \
+    cd SpinalHDL && \
+    sbt compile
+
 # Copy downloaded stuff to SPINAL folder
 #COPY $SPINAL_DIR /SPINAL
 
+CMD ["bash"]
 #ENTRYPOINT [ "/usr/bin/bash" ]
 #ADD entrypoint.sh /
 #ENTRYPOINT ["/entrypoint.sh"]
