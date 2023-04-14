@@ -22,6 +22,7 @@ RUN apt update && apt upgrade -y && \
     software-properties-common \
     sudo \
     tzdata \
+    libboost1.74-dev \
     ghdl \
     iverilog \
     xauth \
