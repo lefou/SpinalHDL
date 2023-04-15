@@ -99,11 +99,13 @@ ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
 RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
     cd SpinalHDL && \
     git submodule update --init --recursive && \
-    sbt compile
+    sbt compile && \
+    cd .. && rm -rf SpinalHDL
 
 RUN DEBIAN_FRONTEND=noninteractive apt purge -y \
     pkg-config \
     clang \
+    clang-14 \
     tcl-dev \
     libreadline-dev \
     flex \
