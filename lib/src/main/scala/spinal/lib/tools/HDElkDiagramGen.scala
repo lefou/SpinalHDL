@@ -1,6 +1,5 @@
 package spinal.lib.tools
 
-
 import spinal.core._
 import java.io.{File, FileWriter}
 import scala.collection.mutable
@@ -11,7 +10,7 @@ class ElkEdge {
   var isBus, highlight = 0
 }
 
-case class ElkPort(name:String,highlight:Int)
+case class ElkPort(name: String, highlight: Int)
 
 class ElkNode {
   var labelName, typeName = ""
@@ -22,6 +21,7 @@ class ElkNode {
 }
 
 class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: String) {
+
   /** Initializing data */
   private val fileName = topLevelName + ".html"
   private val file = new File(fileName)
@@ -38,7 +38,9 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
 
   /** Distinguishing system registers */
   private val allRegisters = moduleAnalyze.getRegisters
-  private val systemRegisters = moduleAnalyze.getNets(net => net.getComponent().getName() == module.getName() && !topInOuts.contains(net) && !allRegisters.contains(net))
+  private val systemRegisters = moduleAnalyze.getNets(net =>
+    net.getComponent().getName() == module.getName() && !topInOuts.contains(net) && !allRegisters.contains(net)
+  )
   private val allInOuts = moduleAnalyze.getPins(_ => true)
   private val everyRegisters = allRegisters ++ systemRegisters
 
@@ -70,8 +72,7 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
               if (dataParent.getName() != "") {
                 returnParent = dataParent
                 loop.break()
-              }
-              else {
+              } else {
                 dataParent.setName("_zz_(" + dataParent.getClass.getSimpleName + ")")
                 returnParent = dataParent
                 loop.break()
@@ -118,27 +119,30 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
   }
 
   private def GenAllNodes(): Unit = {
+
     /** Adding the toplevel module and its input/output ports */
-    def findPortHighlight(thisPort:BaseType): Int = {
-      if(clkMap.contains(thisPort.getName())) clkMap(thisPort.getName())
-      else if(clkMap.contains(thisPort.clockDomain.toString())) clkMap(thisPort.clockDomain.toString())
+    def findPortHighlight(thisPort: BaseType): Int = {
+      if (clkMap.contains(thisPort.getName())) clkMap(thisPort.getName())
+      else if (clkMap.contains(thisPort.clockDomain.toString())) clkMap(thisPort.clockDomain.toString())
       else 1
     }
     for (topInOut <- topInOuts) {
       if (haveParent(topInOut)) {
         val rootParent = findParent(topInOut)
-        if (rootParent.flatten.head.isInput) topNode.inPorts.add(ElkPort(rootParent.getName(),findPortHighlight(topInOut)))
-        else if (rootParent.flatten.head.isOutput) topNode.outPorts.add(ElkPort(rootParent.getName(),findPortHighlight(topInOut)))
+        if (rootParent.flatten.head.isInput)
+          topNode.inPorts.add(ElkPort(rootParent.getName(), findPortHighlight(topInOut)))
+        else if (rootParent.flatten.head.isOutput)
+          topNode.outPorts.add(ElkPort(rootParent.getName(), findPortHighlight(topInOut)))
         else {
-          if (topInOut.isInput) topNode.inPorts.add(ElkPort(rootParent.getName(),findPortHighlight(topInOut)))
-          else topNode.outPorts.add(ElkPort(rootParent.getName(),findPortHighlight(topInOut)))
+          if (topInOut.isInput) topNode.inPorts.add(ElkPort(rootParent.getName(), findPortHighlight(topInOut)))
+          else topNode.outPorts.add(ElkPort(rootParent.getName(), findPortHighlight(topInOut)))
         }
-      }
-      else {
-        if (topInOut.isInput) topNode.inPorts.add(ElkPort(topInOut.getName(),findPortHighlight(topInOut)))
-        else topNode.outPorts.add(ElkPort(topInOut.getName(),findPortHighlight(topInOut)))
+      } else {
+        if (topInOut.isInput) topNode.inPorts.add(ElkPort(topInOut.getName(), findPortHighlight(topInOut)))
+        else topNode.outPorts.add(ElkPort(topInOut.getName(), findPortHighlight(topInOut)))
       }
     }
+
     /** Adding internal sub-modules and their input/output ports */
     val innerModules = module.children
     for (innerModule <- innerModules) {
@@ -146,22 +150,23 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
       newNode.labelName = innerModule.getName()
       if (innerModule.isInstanceOf[BlackBox]) newNode.typeName = "BlackBox"
       val clocks = new ModuleAnalyzer(innerModule).getClocks
-      if(clocks.nonEmpty) newNode.highlight=clkMap(clocks.head.toString())
+      if (clocks.nonEmpty) newNode.highlight = clkMap(clocks.head.toString())
       val innerModuleAna = new ModuleAnalyzer(innerModule)
       val innerInOuts = innerModuleAna.getInputs ++ innerModuleAna.getOutputs
       for (innerInOut <- innerInOuts) {
         if (haveParent(innerInOut)) {
           val rootParent = findParent(innerInOut)
-          if (rootParent.flatten.head.isInput) newNode.inPorts.add(ElkPort(rootParent.getName(),findPortHighlight(innerInOut)))
-          else if (rootParent.flatten.head.isOutput) newNode.outPorts.add(ElkPort(rootParent.getName(),findPortHighlight(innerInOut)))
+          if (rootParent.flatten.head.isInput)
+            newNode.inPorts.add(ElkPort(rootParent.getName(), findPortHighlight(innerInOut)))
+          else if (rootParent.flatten.head.isOutput)
+            newNode.outPorts.add(ElkPort(rootParent.getName(), findPortHighlight(innerInOut)))
           else {
-            if (innerInOut.isInput) newNode.inPorts.add(ElkPort(rootParent.getName(),findPortHighlight(innerInOut)))
-            else newNode.outPorts.add(ElkPort(rootParent.getName(),findPortHighlight(innerInOut)))
+            if (innerInOut.isInput) newNode.inPorts.add(ElkPort(rootParent.getName(), findPortHighlight(innerInOut)))
+            else newNode.outPorts.add(ElkPort(rootParent.getName(), findPortHighlight(innerInOut)))
           }
-        }
-        else {
-          if (innerInOut.isInput) newNode.inPorts.add(ElkPort(innerInOut.getName(),findPortHighlight(innerInOut)))
-          else newNode.outPorts.add(ElkPort(innerInOut.getName(),findPortHighlight(innerInOut)))
+        } else {
+          if (innerInOut.isInput) newNode.inPorts.add(ElkPort(innerInOut.getName(), findPortHighlight(innerInOut)))
+          else newNode.outPorts.add(ElkPort(innerInOut.getName(), findPortHighlight(innerInOut)))
         }
       }
       topNode.children.add(newNode)
@@ -172,8 +177,7 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
       val newNode = new ElkNode
       if (haveParent(topLevelRegister)) {
         newNode.labelName = findParent(topLevelRegister).getName()
-      }
-      else if (haveRegParent(topLevelRegister)) newNode.labelName = findRegParent(topLevelRegister)
+      } else if (haveRegParent(topLevelRegister)) newNode.labelName = findRegParent(topLevelRegister)
       else newNode.labelName = topLevelRegister.getName()
       if (clkMap.contains(topLevelRegister.clockDomain.toString()))
         newNode.highlight = clkMap(topLevelRegister.clockDomain.toString())
@@ -185,6 +189,7 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
   }
 
   private def GenAllEdges(): Unit = {
+
     /** Getting the sonName of net */
     val allNets = everyRegisters ++ allInOuts
     for (net <- allNets) {
@@ -199,28 +204,23 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
           val rootParent = findParent(net)
           if (topInOuts.contains(net)) {
             if (rootParent.flatten.head.isOutput) netIsWrong = true
-          }
-          else {
+          } else {
             if (rootParent.flatten.head.isInput) netIsWrong = true
           }
           sonName = rootParent.getName()
-        }
-        else {
+        } else {
           if (topInOuts.contains(net)) {
             if (net.isOutput) netIsWrong = true
-          }
-          else {
+          } else {
             if (net.isInput) netIsWrong = true
           }
           sonName = net.getName()
         }
-      }
-      else {
+      } else {
         if (haveParent(net)) {
           inIsBus = 1
           sonName = findParent(net).getName()
-        }
-        else if (haveRegParent(net)) sonName = findRegParent(net)
+        } else if (haveRegParent(net)) sonName = findRegParent(net)
         else sonName = net.getName()
       }
 
@@ -237,9 +237,9 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
           }
           if (!judge) netIsWrong = true
         }
-      }
-      else if (everyRegisters.contains(net)) sourceName = sonName
+      } else if (everyRegisters.contains(net)) sourceName = sonName
       else netIsWrong = true
+
       /** Handling connections from input directly to output */
       val dataAnalyze = new DataAnalyzer(net)
       val fanOuts = dataAnalyze.getFanOut
@@ -248,7 +248,11 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
         for (fanOut <- fanOuts) {
           if (net.getComponent().getName() == module.getName() && fanOut.getComponent().getName() == module.getName()) {
             if ((haveParent(net) && findParent(net).flatten.head.isInput) || (!haveParent(net) && net.isInput))
-              if ((haveParent(fanOut) && findParent(fanOut).flatten.head.isOutput) || (!haveParent(fanOut) && fanOut.isOutput)) {
+              if (
+                (haveParent(fanOut) && findParent(fanOut).flatten.head.isOutput) || (!haveParent(
+                  fanOut
+                ) && fanOut.isOutput)
+              ) {
                 val newNode = new ElkNode
                 val newEdge = new ElkEdge
                 if (clkMap.contains(net.clockDomain.toString())) newEdge.highlight = clkMap(net.clockDomain.toString())
@@ -264,7 +268,9 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
                 newEdge.target = sonName
                 var isContained = false
                 for (thisEdge <- edges) {
-                  if (thisEdge.source == newEdge.source && thisEdge.target == newEdge.target && thisEdge.label == newEdge.label)
+                  if (
+                    thisEdge.source == newEdge.source && thisEdge.target == newEdge.target && thisEdge.label == newEdge.label
+                  )
                     isContained = true
                 }
                 if (!netIsWrong && !isContained)
@@ -289,51 +295,46 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
             val rootParent = findParent(fanOut)
             if (topInOuts.contains(fanOut)) {
               if (rootParent.flatten.head.isInput) fanOutIsWrong = true
-            }
-            else {
+            } else {
               if (rootParent.flatten.head.isOutput) fanOutIsWrong = true
             }
             fanOutSonName = rootParent.getName()
-          }
-          else {
+          } else {
             if (topInOuts.contains(fanOut)) {
               if (fanOut.isInput) fanOutIsWrong = true
-            }
-            else if (fanOut.isOutput) fanOutIsWrong = true
+            } else if (fanOut.isOutput) fanOutIsWrong = true
             fanOutSonName = fanOut.getName()
           }
-        }
-        else {
+        } else {
           if (haveParent(fanOut)) {
             outIsBus = 1
             fanOutSonName = findParent(fanOut).getName()
-          }
-          else if (haveRegParent(fanOut)) fanOutSonName = findRegParent(fanOut)
+          } else if (haveRegParent(fanOut)) fanOutSonName = findRegParent(fanOut)
           else fanOutSonName = fanOut.getName()
         }
 
         /** Getting the destination name */
         if (allInOuts.contains(fanOut)) {
           if (topInOuts.contains(fanOut)) {
-            if(!netIsWrong && !fanOutIsWrong && fanOut.isReg){
-              val extraEdge=new ElkEdge
-              extraEdge.source=fanOutSonName
-              extraEdge.target=moduleName + "." + fanOutSonName
-              extraEdge.isBus=inIsBus & outIsBus
+            if (!netIsWrong && !fanOutIsWrong && fanOut.isReg) {
+              val extraEdge = new ElkEdge
+              extraEdge.source = fanOutSonName
+              extraEdge.target = moduleName + "." + fanOutSonName
+              extraEdge.isBus = inIsBus & outIsBus
               var isContained = false
               for (thisEdge <- edges) {
-                if (thisEdge.source == extraEdge.source && thisEdge.target == extraEdge.target && thisEdge.label == extraEdge.label)
+                if (
+                  thisEdge.source == extraEdge.source && thisEdge.target == extraEdge.target && thisEdge.label == extraEdge.label
+                )
                   isContained = true
               }
-              if(!isContained)
+              if (!isContained)
                 edges.add(extraEdge)
-              newEdge.target=fanOutSonName
+              newEdge.target = fanOutSonName
 
-            }
-            else
+            } else
               newEdge.target = moduleName + "." + fanOutSonName
-          }
-          else if (fanOut.getComponent() == net.getComponent()) fanOutIsWrong = true
+          } else if (fanOut.getComponent() == net.getComponent()) fanOutIsWrong = true
           else {
             var judge = false
             for (thisNode <- topNode.children) {
@@ -345,11 +346,9 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
             if (!judge)
               fanOutIsWrong = true
           }
-        }
-        else if (everyRegisters.contains(fanOut)) {
+        } else if (everyRegisters.contains(fanOut)) {
           newEdge.target = fanOutSonName
-        }
-        else fanOutIsWrong = true
+        } else fanOutIsWrong = true
 
         /** Setting and adding Edge */
         if (clkMap.contains(net.getName())) newEdge.highlight = clkMap(net.getName())
@@ -357,14 +356,14 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
         newEdge.source = sourceName
         newEdge.isBus = inIsBus & outIsBus
         if (newEdge.isBus == 1) {
-          if (findParent(net).getClass.getSimpleName == findParent(fanOut).getClass.getSimpleName) newEdge.label = findParent(fanOut).getClass.getSimpleName
-          else newEdge.label = findParent(net).getClass.getSimpleName + " to " + findParent(fanOut).getClass.getSimpleName
-        }
-        else if (inIsBus == 1) {
+          if (findParent(net).getClass.getSimpleName == findParent(fanOut).getClass.getSimpleName)
+            newEdge.label = findParent(fanOut).getClass.getSimpleName
+          else
+            newEdge.label = findParent(net).getClass.getSimpleName + " to " + findParent(fanOut).getClass.getSimpleName
+        } else if (inIsBus == 1) {
           if (!clkMap.contains(net.getName()))
             newEdge.label = net.getName()
-        }
-        else if (outIsBus == 1) {
+        } else if (outIsBus == 1) {
           if (!clkMap.contains(fanOut.getName()))
             newEdge.label = fanOut.getName()
         }
@@ -386,8 +385,8 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
     if (thisNode.highlight != 0) pw.write(s"""highlight:${thisNode.highlight},\n""")
     if (thisNode.inPorts.nonEmpty) {
       pw.write(s"""inPorts: [""")
-      for (inPort <- thisNode.inPorts){
-        if(inPort.highlight!=1) pw.write(s"""{id:"${inPort.name}",highlight:${inPort.highlight}},""")
+      for (inPort <- thisNode.inPorts) {
+        if (inPort.highlight != 1) pw.write(s"""{id:"${inPort.name}",highlight:${inPort.highlight}},""")
         else pw.write(s""""${inPort.name}",""")
       }
       pw.write(s"""],\n""")
@@ -456,6 +455,7 @@ class GenerateOneDiagram(module: Component, topLevelName: String, moduleName: St
 }
 
 object HDElkDiagramGen {
+
   /** Generating all diagrams */
   def apply[T <: Component](rtl: SpinalReport[T]): Unit = {
     val fileName = rtl.toplevelName + ".html"
@@ -549,4 +549,3 @@ object HDElkDiagramGen {
     pw.close()
   }
 }
-
