@@ -9,28 +9,25 @@ ARG SPINAL_DIR=/data
 
 # Install tools and other stuff
 RUN apt update && apt upgrade -y && \
-    DEBIAN_FRONTEND=noninteractive apt install -y \
+    DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
     autoconf \
     build-essential \
     curl \
     git \
+    unzip \
     gnupg2 \
-    gtkwave \
-    mc \
-    openjdk-8-jdk \
+    openjdk-11-jdk-headless \
     scala \
-    software-properties-common \
-    sudo \
     tzdata \
     libboost1.74-dev \
     ghdl \
     iverilog \
-    xauth \
     && apt clean
 
 RUN DEBIAN_FRONTEND=noninteractive apt install -y \
     pkg-config \
     clang \
+    tcl \
     tcl-dev \
     libreadline-dev \
     flex \
