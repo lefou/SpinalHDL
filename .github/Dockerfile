@@ -77,12 +77,21 @@ RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E4
         | tee /etc/apt/sources.list.d/sbt_old.list \
     && apt update && apt install sbt
 
+ARG MILL_VERSION="0.10.9"
+RUN \
+  curl -L -o /usr/local/bin/mill https://github.com/lihaoyi/mill/releases/download/$MILL_VERSION/$MILL_VERSION && \
+  chmod +x /usr/local/bin/mill && \
+  touch build.sc && \
+  mill -i resolve _ && \
+  rm build.sc
+
 ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
 ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
 RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
     cd SpinalHDL && \
     git submodule update --init --recursive && \
     sbt compile && \
+    mill _.compile && \
     cd .. && rm -rf SpinalHDL
 
 FROM ubuntu:$UBUNTU_VERSION AS run
@@ -108,5 +117,7 @@ RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E4
 
 COPY --from=build-symbiyosys /opt /opt
 COPY --from=build-verilator /opt /opt
+COPY --from=build-spinal /opt /opt
+COPY --from=build-spinal /usr/local/bin/mill /opt/bin/mill
 COPY --from=build-spinal /root/.cache /root/.cache
 COPY --from=build-spinal /root/.sbt /root/.sbt
