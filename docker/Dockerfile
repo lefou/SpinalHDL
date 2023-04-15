@@ -3,86 +3,71 @@
 #
 # Author(s): Pavel Benacek <pavel.benacek@gmail.com>
 
-FROM ubuntu:22.04
+ARG UBUNTU_VERSION=22.04
+FROM ubuntu:$UBUNTU_VERSION AS builder
 
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PREFIX=/opt
 ARG SPINAL_DIR=/data
 
-# Install tools and other stuff
-RUN apt update && apt upgrade -y && \
-    DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
-    autoconf \
-    build-essential \
-    curl \
-    git \
-    unzip \
-    gnupg2 \
-    openjdk-11-jdk-headless \
-    scala \
-    tzdata \
-    libboost1.74-dev \
-    ghdl \
-    iverilog \
-    && apt clean
+ARG DEPS_COMMON="autoconf build-essential ca-certificates curl git clang python3"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends $DEPS_COMMON
 
-RUN DEBIAN_FRONTEND=noninteractive apt install -y \
-    pkg-config \
-    clang \
-    tcl \
-    tcl-dev \
-    libreadline-dev \
-    flex \
-    bison \
-    && apt clean
+FROM builder AS build-symbiyosys
 
-RUN DEBIAN_FRONTEND=noninteractive apt install -y \
-    python3 \
-    python3-pip \
-    python3-pip-whl \
-    && apt clean
-RUN pip install cocotb cocotb-test click
+ARG DEPS_YOSYS="libffi-dev libreadline-dev pkg-config tcl-dev unzip flex bison"
+RUN apt-get install -y --no-install-recommends $DEPS_YOSYS
 
-ARG VERILATOR_VERSION=v4.228
-ARG YOSYS_VERSION=master
-ARG SYMBIYOSYS_VERSION=master
-
-WORKDIR /tmp
-
-RUN git clone "https://github.com/verilator/verilator" verilator && \
-    cd verilator && \
-    git checkout "${VERILATOR_VERSION}" && \
-    autoconf && \
-    ./configure && \
-    make -j "$(nproc)" && \
-    make install && \
-    cd .. && \
-    rm -r verilator
-
+ARG YOSYS_VERSION="yosys-0.28"
 RUN git clone https://github.com/YosysHQ/yosys.git yosys && \
     cd yosys && \
-    git checkout "${YOSYS_VERSION}" && \
-    make -j$(nproc) && \
-    make install && \
-    cd .. && rm -rf yosys 
+    git checkout $YOSYS_VERSION && \
+    make PREFIX=$PREFIX -j$(nproc) && \
+    make PREFIX=$PREFIX install && \
+    cd .. && \
+    rm -Rf yosys
 
-# Install Symbiyosys
-RUN git clone https://github.com/YosysHQ/SymbiYosys.git SymbiYosys && \
-    cd SymbiYosys && \
-    git checkout "${SYMBIYOSYS_VERSION}" && \
-    make install && \
-    cd .. && rm -rf SymbiYosys 
-
-RUN mkdir solver && cd solver
-RUN curl -o solvers.zip -sL "https://github.com/GaloisInc/what4-solvers/releases/download/snapshot-20221212/ubuntu-22.04-bin.zip"
-RUN unzip solvers.zip && \
+ARG SOLVERS_PATH="snapshot-20221212/ubuntu-22.04-bin.zip"
+RUN mkdir solver && cd solver && \
+    curl -o solvers.zip -sL "https://github.com/GaloisInc/what4-solvers/releases/download/${SOLVERS_PATH}" && \
+    unzip solvers.zip && \
     rm solvers.zip && \
     chmod +x * && \
-    cp cvc4 /usr/local/bin/cvc4 && \
-    cp cvc5 /usr/local/bin/cvc5 && \
-    cp z3 /usr/local/bin/z3 && \
-    cp yices /usr/local/bin/yices && \
-    cp yices-smt2 /usr/local/bin/yices-smt2 && \
+    cp cvc4 $PREFIX/bin/cvc4 && \
+    cp cvc5 $PREFIX/bin/cvc5 && \
+    cp z3 $PREFIX/bin/z3 && \
+    cp yices $PREFIX/bin/yices && \
+    cp yices-smt2 $PREFIX/bin/yices-smt2 && \
     cd .. && rm -rf solver
 
+ARG SYMBIYOSYS_VERSION="yosys-0.28"
+RUN git clone https://github.com/YosysHQ/sby.git SymbiYosys && \
+    cd SymbiYosys && \
+    git checkout $SYMBIYOSYS_VERSION && \
+    make PREFIX=$PREFIX -j$(nproc) install && \
+    cd .. && \
+    rm -Rf SymbiYosys
+
+FROM builder AS build-verilator
+
+ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
+RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
+
+ARG VERILATOR_VERSION="v4.228"
+RUN git clone https://github.com/verilator/verilator verilator && \
+    cd verilator && \
+    git checkout $VERILATOR_VERSION && \
+    autoconf && \
+    ./configure --prefix $PREFIX && \
+    make PREFIX=$PREFIX -j$(nproc) && \
+    make PREFIX=$PREFIX install && \
+    cd ../.. && \
+    rm -Rf verilator
+
+FROM builder AS build-spinal
+
+ARG DEPS_SPINAL="gnupg2 openjdk-11-jdk-headless"
+RUN apt-get install -y --no-install-recommends $DEPS_SPINAL
 # Add repos and install sbt 
 RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
         | gpg2 --dearmour -o /usr/share/keyrings/sdb-keyring.gpg \
@@ -92,8 +77,6 @@ RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E4
         | tee /etc/apt/sources.list.d/sbt_old.list \
     && apt update && apt install sbt
 
-WORKDIR $SPINAL_DIR
-
 ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
 ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
 RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
@@ -102,14 +85,28 @@ RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \
     sbt compile && \
     cd .. && rm -rf SpinalHDL
 
-RUN DEBIAN_FRONTEND=noninteractive apt purge -y \
-    pkg-config \
-    clang \
-    clang-14 \
-    tcl-dev \
-    libreadline-dev \
-    flex \
-    bison \
-    && apt autoremove -y && apt clean
+FROM ubuntu:$UBUNTU_VERSION AS run
 
-CMD ["bash"]
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin"
+
+ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends $DEPS_RUNTIME && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    locale-gen en_US.UTF-8
+RUN pip install cocotb cocotb-test click
+
+# Add repos and install sbt 
+RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
+        | gpg2 --dearmour -o /usr/share/keyrings/sdb-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/sdb-keyring.gpg] https://repo.scala-sbt.org/scalasbt/debian all main" \
+        | tee /etc/apt/sources.list.d/sbt.list \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/sdb-keyring.gpg] https://repo.scala-sbt.org/scalasbt/debian /" \
+        | tee /etc/apt/sources.list.d/sbt_old.list \
+    && apt update && apt install sbt && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build-symbiyosys /opt /opt
+COPY --from=build-verilator /opt /opt
+COPY --from=build-spinal /root/.cache /root/.cache
+COPY --from=build-spinal /root/.sbt /root/.sbt
