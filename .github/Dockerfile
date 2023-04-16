@@ -85,14 +85,14 @@ RUN \
   mill -i resolve _ && \
   rm build.sc
 
-ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
-ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
-RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
-    cd SpinalHDL && \
-    git submodule update --init --recursive && \
-    sbt compile && \
-    mill _.compile && \
-    cd .. && rm -rf SpinalHDL
+# ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
+# ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
+# RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
+#     cd SpinalHDL && \
+#     git submodule update --init --recursive && \
+#     sbt compile && \
+#     mill _.compile && \
+#     cd .. && rm -rf SpinalHDL
 
 FROM ubuntu:$UBUNTU_VERSION AS run
 
@@ -119,5 +119,5 @@ COPY --from=build-symbiyosys /opt /opt
 COPY --from=build-verilator /opt /opt
 COPY --from=build-spinal /opt /opt
 COPY --from=build-spinal /usr/local/bin/mill /opt/bin/mill
-COPY --from=build-spinal /root/.cache /root/.cache
-COPY --from=build-spinal /root/.sbt /root/.sbt
+# COPY --from=build-spinal /root/.cache /root/.cache
+# COPY --from=build-spinal /root/.sbt /root/.sbt
