@@ -66,6 +66,9 @@ RUN git clone https://github.com/verilator/verilator verilator && \
 
 FROM builder AS build-spinal
 
+ENV COURSIER_CACHE="/coursier/.cache"
+ENV SBT_OPTS="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/.sbt/boot -Dsbt.global.base=/sbt/.sbt -Dsbt.ivy.home=/sbt/.ivy2 -Duser.home=/sbt -Dsbt.global.localcache=/sbt/.sbt/cache"
+
 ARG DEPS_SPINAL="gnupg2 openjdk-11-jdk-headless"
 RUN apt-get install -y --no-install-recommends $DEPS_SPINAL
 # Add repos and install sbt 
@@ -85,14 +88,14 @@ RUN \
   mill -i resolve _ && \
   rm build.sc
 
-# ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
-# ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
-# RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
-#     cd SpinalHDL && \
-#     git submodule update --init --recursive && \
-#     sbt compile && \
-#     mill _.compile && \
-#     cd .. && rm -rf SpinalHDL
+ARG JAVA_EXTRA_OPTS="-Xmx2g -Xms2g"
+ENV JAVA_OPTS="${JAVA_OPTS} ${JAVA_EXTRA_OPTS}"
+RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \ 
+    cd SpinalHDL && \
+    git submodule update --init --recursive && \
+    sbt compile && \
+    mill _.compile && \
+    cd .. && rm -rf SpinalHDL
 
 FROM ubuntu:$UBUNTU_VERSION AS run
 
@@ -119,5 +122,5 @@ COPY --from=build-symbiyosys /opt /opt
 COPY --from=build-verilator /opt /opt
 COPY --from=build-spinal /opt /opt
 COPY --from=build-spinal /usr/local/bin/mill /opt/bin/mill
-# COPY --from=build-spinal /root/.cache /root/.cache
-# COPY --from=build-spinal /root/.sbt /root/.sbt
+COPY --from=build-spinal /coursier /coursier
+COPY --from=build-spinal /sbt /sbt
