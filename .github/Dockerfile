@@ -4,16 +4,22 @@
 # Author(s): Pavel Benacek <pavel.benacek@gmail.com>
 
 ARG UBUNTU_VERSION=22.04
-FROM ubuntu:$UBUNTU_VERSION AS builder
+FROM ubuntu:$UBUNTU_VERSION AS base
 
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PREFIX=/opt
+
+ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
+ARG COURSIER_CACHE_DEFAULT="/sbt/.cache/coursier/v1"
+ARG SBT_OPTS_DEFAULT="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/.sbt/boot -Dsbt.global.base=/sbt/.sbt -Dsbt.ivy.home=/sbt/.ivy2 -Duser.home=/sbt -Dsbt.global.localcache=/sbt/.sbt/cache"
+ENV COURSIER_CACHE=$COURSIER_CACHE_DEFAULT
+ENV SBT_OPTS=$SBT_OPTS_DEFAULT
 ARG SPINAL_DIR=/data
 
 ARG DEPS_COMMON="autoconf build-essential ca-certificates curl git clang python3"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends $DEPS_COMMON
 
-FROM builder AS build-symbiyosys
+FROM base AS build-symbiyosys
 
 ARG DEPS_YOSYS="libffi-dev libreadline-dev pkg-config tcl-dev unzip flex bison"
 RUN apt-get install -y --no-install-recommends $DEPS_YOSYS
@@ -48,7 +54,7 @@ RUN git clone https://github.com/YosysHQ/sby.git SymbiYosys && \
     cd .. && \
     rm -Rf SymbiYosys
 
-FROM builder AS build-verilator
+FROM base AS build-verilator
 
 ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
@@ -64,10 +70,7 @@ RUN git clone https://github.com/verilator/verilator verilator && \
     cd ../.. && \
     rm -Rf verilator
 
-FROM builder AS build-spinal
-
-ENV COURSIER_CACHE="/coursier/.cache"
-ENV SBT_OPTS="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/.sbt/boot -Dsbt.global.base=/sbt/.sbt -Dsbt.ivy.home=/sbt/.ivy2 -Duser.home=/sbt -Dsbt.global.localcache=/sbt/.sbt/cache"
+FROM base AS build-spinal
 
 ARG DEPS_SPINAL="gnupg2 openjdk-11-jdk-headless"
 RUN apt-get install -y --no-install-recommends $DEPS_SPINAL
@@ -97,11 +100,10 @@ RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \
     mill _.compile && \
     cd .. && rm -rf SpinalHDL
 
-FROM ubuntu:$UBUNTU_VERSION AS run
+FROM base AS run
 
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin"
 
-ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends $DEPS_RUNTIME && \
     apt-get clean && \
@@ -122,5 +124,4 @@ COPY --from=build-symbiyosys /opt /opt
 COPY --from=build-verilator /opt /opt
 COPY --from=build-spinal /opt /opt
 COPY --from=build-spinal /usr/local/bin/mill /opt/bin/mill
-COPY --from=build-spinal /coursier /coursier
 COPY --from=build-spinal /sbt /sbt
