@@ -109,7 +109,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     locale-gen en_US.UTF-8
-RUN pip install cocotb cocotb-test click
+RUN pip install cocotb cocotb-test click && \
+    pip purge
 
 # Add repos and install sbt 
 RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
