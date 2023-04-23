@@ -6,7 +6,7 @@
 ARG UBUNTU_VERSION=22.04
 FROM ubuntu:$UBUNTU_VERSION AS base
 
-ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PREFIX=/opt
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin"
 
 ARG COURSIER_CACHE_DEFAULT="/sbt/.cache/coursier/v1"
 ARG SBT_OPTS_DEFAULT="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/.sbt/boot -Dsbt.global.base=/sbt/.sbt -Dsbt.ivy.home=/sbt/.ivy2 -Duser.home=/sbt -Dsbt.global.localcache=/sbt/.sbt/cache"
@@ -19,6 +19,7 @@ RUN apt-get update && \
 
 FROM base AS build-symbiyosys
 
+ENV PREFIX=/opt
 ARG DEPS_YOSYS="autoconf build-essential clang libffi-dev libreadline-dev pkg-config tcl-dev unzip flex bison"
 RUN apt-get install -y --no-install-recommends $DEPS_YOSYS
 
@@ -54,6 +55,7 @@ RUN git clone https://github.com/YosysHQ/sby.git SymbiYosys && \
 
 FROM base AS build-verilator
 
+ENV PREFIX=/opt
 ARG DEPS_VERILATOR="perl make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
 
@@ -97,8 +99,6 @@ RUN git clone https://github.com/SpinalHDL/SpinalHDL.git && \
     cd .. && rm -rf SpinalHDL
 
 FROM base AS run
-
-ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin"
 
 RUN pip install cocotb cocotb-test click && \
     pip cache purge
