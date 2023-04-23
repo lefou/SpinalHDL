@@ -8,20 +8,18 @@ FROM ubuntu:$UBUNTU_VERSION AS base
 
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PREFIX=/opt
 
-ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
 ARG COURSIER_CACHE_DEFAULT="/sbt/.cache/coursier/v1"
 ARG SBT_OPTS_DEFAULT="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/.sbt/boot -Dsbt.global.base=/sbt/.sbt -Dsbt.ivy.home=/sbt/.ivy2 -Duser.home=/sbt -Dsbt.global.localcache=/sbt/.sbt/cache"
 ENV COURSIER_CACHE=$COURSIER_CACHE_DEFAULT
 ENV SBT_OPTS=$SBT_OPTS_DEFAULT
-ARG SPINAL_DIR=/data
 
-ARG DEPS_COMMON="autoconf build-essential ca-certificates curl git clang python3"
+ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends $DEPS_COMMON
+    apt-get install -y --no-install-recommends $DEPS_RUNTIME
 
 FROM base AS build-symbiyosys
 
-ARG DEPS_YOSYS="libffi-dev libreadline-dev pkg-config tcl-dev unzip flex bison"
+ARG DEPS_YOSYS="autoconf build-essential clang libffi-dev libreadline-dev pkg-config tcl-dev unzip flex bison"
 RUN apt-get install -y --no-install-recommends $DEPS_YOSYS
 
 ARG YOSYS_VERSION="yosys-0.28"
@@ -56,7 +54,7 @@ RUN git clone https://github.com/YosysHQ/sby.git SymbiYosys && \
 
 FROM base AS build-verilator
 
-ARG DEPS_VERILATOR="perl python3 make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
+ARG DEPS_VERILATOR="perl make autoconf g++ flex bison ccache libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev"
 RUN apt-get install -y --no-install-recommends $DEPS_VERILATOR
 
 ARG VERILATOR_VERSION="v4.228"
@@ -72,8 +70,6 @@ RUN git clone https://github.com/verilator/verilator verilator && \
 
 FROM base AS build-spinal
 
-ARG DEPS_SPINAL="gnupg2 openjdk-11-jdk-headless"
-RUN apt-get install -y --no-install-recommends $DEPS_SPINAL
 # Add repos and install sbt 
 RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
         | gpg2 --dearmour -o /usr/share/keyrings/sdb-keyring.gpg \
@@ -104,13 +100,8 @@ FROM base AS run
 
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends $DEPS_RUNTIME && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    locale-gen en_US.UTF-8
 RUN pip install cocotb cocotb-test click && \
-    pip purge
+    pip cache purge
 
 # Add repos and install sbt 
 RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
@@ -119,7 +110,7 @@ RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E4
         | tee /etc/apt/sources.list.d/sbt.list \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/sdb-keyring.gpg] https://repo.scala-sbt.org/scalasbt/debian /" \
         | tee /etc/apt/sources.list.d/sbt_old.list \
-    && apt update && apt install sbt && rm -rf /var/lib/apt/lists/*
+    && apt update && apt install sbt && apt clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build-symbiyosys /opt /opt
 COPY --from=build-verilator /opt /opt
