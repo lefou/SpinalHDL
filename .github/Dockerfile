@@ -13,7 +13,7 @@ ARG SBT_OPTS_DEFAULT="-Dsbt.override.build.repos=true -Dsbt.boot.directory=/sbt/
 ENV COURSIER_CACHE=$COURSIER_CACHE_DEFAULT
 ENV SBT_OPTS=$SBT_OPTS_DEFAULT
 
-ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-11-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
+ARG DEPS_RUNTIME="ca-certificates gnupg2 openjdk-17-jdk-headless ccache curl g++ gcc git libtcl8.6 python3 python3-pip python3-pip-whl libpython3-dev ssh locales make ghdl iverilog libboost1.74-dev"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends $DEPS_RUNTIME
 
