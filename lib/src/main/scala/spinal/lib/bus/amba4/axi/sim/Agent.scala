@@ -33,6 +33,7 @@ abstract class Axi4WriteOnlyMasterAgent(aw : Stream[Axi4Aw], w : Stream[Axi4W], 
   val idCount = if(busConfig.useId) (1 << busConfig.idWidth) else 1
   val bQueue = Array.fill(idCount)(mutable.Queue[() => Unit]())
   var allowGen = true
+  var cmdCounter = 0
   var rspCounter = 0
   val assertOkResp = true
   def pending = bQueue.exists(_.nonEmpty)
@@ -92,6 +93,7 @@ abstract class Axi4WriteOnlyMasterAgent(aw : Stream[Axi4Aw], w : Stream[Axi4W], 
       if (addrValid) mapping = SizeMapping(startAddress, endAddress - startAddress)
     } while(!addrValid || !mappingAllocate(mapping));
 
+    cmdCounter += 1
     awQueue.enqueue { () =>
       aw.addr #= address
       if (busConfig.useId) aw.id #= id
@@ -173,6 +175,7 @@ abstract class Axi4ReadOnlyMasterAgent(ar : Stream[Axi4Ar], r : Stream[Axi4R], c
   val idCount = if(busConfig.useId) (1 << busConfig.idWidth) else 1
   val rQueue = Array.fill(idCount)(mutable.Queue[() => Unit]())
   var allowGen = true
+  var cmdCounter = 0
   var rspCounter = 0
   val assertOkResp = true
 
@@ -231,6 +234,7 @@ abstract class Axi4ReadOnlyMasterAgent(ar : Stream[Axi4Ar], r : Stream[Axi4R], c
       if (addrValid) mapping = SizeMapping(startAddress, endAddress - startAddress)
     } while(!addrValid || !mappingAllocate(mapping));
 
+    cmdCounter += 1
     arQueue.enqueue { () =>
       ar.addr #= address
       if (busConfig.useId) ar.id #= id
@@ -288,11 +292,13 @@ class Axi4WriteOnlySlaveAgent(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : Stream
       + "determine the burst length of transcation by last signal should not work.")
   }
 
-  var awQueueDepth = 1
+  var awQueueDepth = 8
+  var bQueueDepth = 4
   val awQueue = mutable.Queue[Int]()
   val idCount = if(busConfig.useId) (1 << busConfig.idWidth) else 1
   val bQueue = Array.fill(idCount)(mutable.Queue[() => Unit]())
-  
+  var qPending = 0
+
   val wQueue = mutable.Queue[Boolean]()
   val wProcess = mutable.Queue[(Boolean) => Unit]()
 
@@ -312,6 +318,7 @@ class Axi4WriteOnlySlaveAgent(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : Stream
         if(busConfig.useLast) assert(last == (beat == len))
         if(beat == len){
           val id = awQueue.dequeue()
+          qPending += 1
           bQueue(id) += {() =>
             if(busConfig.useId) b.id #= id
             if(busConfig.useResp) b.resp #= 0
@@ -331,14 +338,15 @@ class Axi4WriteOnlySlaveAgent(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : Stream
     val queues = bQueue.filter(_.nonEmpty)
     if(queues.nonEmpty) {
       queues(Random.nextInt(queues.size)).dequeue().apply()
+      qPending -= 1
       true
     }else{
       false
     }
   }
 
-  val awDriver = StreamReadyRandomizer(aw, clockDomain, () => awQueue.size < awQueueDepth)
-  val wDriver = StreamReadyRandomizer(w, clockDomain)
+  val awDriver = StreamReadyRandomizer(aw, clockDomain, () => awQueue.size < awQueueDepth && qPending < bQueueDepth)
+  val wDriver = StreamReadyRandomizer(w, clockDomain,  () => qPending < bQueueDepth)
 }
 
 
@@ -357,10 +365,12 @@ class Axi4ReadOnlySlaveAgent(ar : Stream[Axi4Ar], r : Stream[Axi4R], clockDomain
       + "determine the burst length of transcation by last signal should not work.")
   }
 
-  var arQueueDepth = 1
+  var arQueueDepth = 8
+  var rQueueDepth = 256
+  var rPending = 0
   val arQueue = mutable.Queue[Int]()
   val idCount = if(busConfig.useId) (1 << busConfig.idWidth) else 1
-  val rQueue = Array.fill(idCount)(mutable.Queue[() => Unit]())
+  val rQueue = Array.fill(idCount)(mutable.Queue[(Boolean, () => Unit)]())
   def readByte(address : BigInt) : Byte = Random.nextInt().toByte
   def onReadStart(address : BigInt, size : Int, length : Int) : Unit = {}
 
@@ -383,7 +393,8 @@ class Axi4ReadOnlySlaveAgent(ar : Stream[Axi4Ar], r : Stream[Axi4R], clockDomain
             (base + ((addr + bytePerBeat*beat) & BigInt(bytes-1))) &  ~BigInt(busConfig.bytePerWord-1)
           }
         }
-        rQueue(id) += { () =>
+        rPending += 1
+        rQueue(id) += (beat == len) -> { () =>
           if (busConfig.useId) r.id #= id
           if (busConfig.useResp) r.resp #= 0
           if (busConfig.useLast) r.last #= (beat == len)
@@ -401,18 +412,28 @@ class Axi4ReadOnlySlaveAgent(ar : Stream[Axi4Ar], r : Stream[Axi4R], clockDomain
     arQueue.enqueue(id)
   }
 
-
+  var rQueueLock : mutable.Queue[(Boolean, () => Unit)] = null
   val rDriver = StreamDriver(r, clockDomain){ _ =>
-    val queues = rQueue.filter(_.nonEmpty)
-    if(queues.nonEmpty) {
-      queues(Random.nextInt(queues.size)).dequeue().apply()
+    if(rQueueLock == null){
+      val queues = rQueue.filter(_.nonEmpty)
+      if(queues.nonEmpty) {
+        rQueueLock = queues(Random.nextInt(queues.size))
+      }
+    }
+    if(rQueueLock != null) {
+      val item = rQueueLock.dequeue()
+      item._2()
+      rPending -= 1
+      if(item._1) {
+        rQueueLock = null
+      }
       true
     }else{
       false
     }
   }
 
-  val arDriver = StreamReadyRandomizer(ar, clockDomain, () => arQueue.size < arQueueDepth)
+  val arDriver = StreamReadyRandomizer(ar, clockDomain, () => arQueue.size < arQueueDepth && rPending < rQueueDepth)
 }
 
 abstract class Axi4WriteOnlyMonitor(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : Stream[Axi4B], clockDomain: ClockDomain) {
@@ -437,6 +458,8 @@ abstract class Axi4WriteOnlyMonitor(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : 
   def onResponse(id: Int, resp: Byte): Unit = {}
   case class WTransaction(data : BigInt, strb : BigInt, last : Boolean)
   case class BTransaction(resp: Byte, id: Int)
+
+  var awCounter, wCounter, bCounter = 0
 
   val wQueue = mutable.Queue[WTransaction]()
   val wProcess = mutable.Queue[(WTransaction) => Unit]()
@@ -492,6 +515,7 @@ abstract class Axi4WriteOnlyMonitor(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : 
         }
       }
     }
+    awCounter += 1
     update()
   }
 
@@ -499,6 +523,7 @@ abstract class Axi4WriteOnlyMonitor(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : 
     val strb = if(busConfig.useStrb) w.strb.toBigInt else ((BigInt(1) << busConfig.bytePerWord) - 1)
     val last = if(busConfig.useLast) w.last.toBoolean else false
     wQueue += WTransaction(w.data.toBigInt, strb, last)
+    wCounter += 1
     update()
   }
 
@@ -506,6 +531,7 @@ abstract class Axi4WriteOnlyMonitor(aw : Stream[Axi4Aw], w : Stream[Axi4W], b : 
     val id = if (busConfig.useId) b.id.toInt.toByte else 0
     val resp: Byte = if (busConfig.useResp) b.resp.toInt.toByte else 0
     bQueue += BTransaction(resp, id)
+    bCounter += 1
     update()
   }
 
@@ -534,6 +560,7 @@ abstract class Axi4ReadOnlyMonitor(ar : Stream[Axi4Ar], r : Stream[Axi4R], clock
   }
 
   val assertOkResp = true
+  var arCounter, rCounter, rLastCounter = 0
 
   def onReadStart(address: BigInt, id: Int, size: Int, len: Int, burst: Int): Unit = {}
   def onReadByteAlways(address: BigInt, data: Byte, id: Int): Unit = {}
@@ -542,7 +569,7 @@ abstract class Axi4ReadOnlyMonitor(ar : Stream[Axi4Ar], r : Stream[Axi4R], clock
   @deprecated("Use onResponse which provides more transaction information")
   def onLast(id: Int): Unit = {} // Legacy, use onResponse for more transaction information
 
-  val rQueue = mutable.Queue[() => Unit]()
+  val rQueue = Array.fill((1 << ar.payload.config.idWidth) max 1)(mutable.Queue[(Boolean, () => Unit)]())
 
   val arMonitor = StreamMonitor(ar, clockDomain){_ =>
     val size = if(busConfig.useSize) ar.size.toInt else log2Up(busConfig.dataWidth / 8)
@@ -567,7 +594,7 @@ abstract class Axi4ReadOnlyMonitor(ar : Stream[Axi4Ar], r : Stream[Axi4R], clock
       }
       val accessAddress = beatAddress & ~BigInt(busConfig.bytePerWord-1)
 
-      rQueue += { () =>
+      rQueue(id) += (beat == len) -> { () =>
         if(busConfig.useLast) assert(r.last.toBoolean == (beat == len))
         if(busConfig.useResp && assertOkResp) assert(r.resp.toInt == 0)
         val data = r.data.toBigInt
@@ -586,13 +613,25 @@ abstract class Axi4ReadOnlyMonitor(ar : Stream[Axi4Ar], r : Stream[Axi4R], clock
         onResponse(accessAddress, id, last, resp)
       }
     }
+    arCounter += 1
   }
 
+  var rIdLock = -1
   val rMonitor = StreamMonitor(r, clockDomain){r =>
-    rQueue.dequeue().apply()
+    val id = if(ar.payload.config.useId) r.id.toInt else 0
+    rIdLock match {
+      case -1 => rIdLock = id
+      case ref => assert(ref == id, "Bad read id")
+    }
+    val item = rQueue(id).dequeue()
+    item._2.apply()
+    if(item._1) rIdLock = -1
+    if(r.config.useLast) assert(r.last.toBoolean == item._1, "Bad read last")
+    rCounter += 1
+    rLastCounter += (if(r.config.useLast)r.last.toBoolean.toInt else 1)
   }
 
   def reset(){
-    rQueue.clear()
+    rQueue.foreach(_.clear())
   }
 }

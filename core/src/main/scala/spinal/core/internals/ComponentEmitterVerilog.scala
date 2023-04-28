@@ -126,6 +126,9 @@ class ComponentEmitterVerilog(
 
         val portName = anonymSignalPrefix + "_" + mem.getName() + "_port" + portId
         s match {
+          case s : Nameable => s.unsetName().setName(portName)
+        }
+        s match {
           case s: MemReadSync  =>
             val name = component.localNamingScope.allocateName(portName)
             declarations ++= emitExpressionWrap(s, name, "reg")
@@ -1512,11 +1515,11 @@ end
   }
 
   def shiftRightByIntImpl(e: Operator.BitVector.ShiftRightByInt): String = {
-    s"(${emitExpression(e.source)} >>> ${e.shift})"
+    s"(${emitExpression(e.source)} >>> ${log2Up(e.shift+1)}'d${e.shift})"
   }
 
   def shiftLeftByIntImpl(e: Operator.BitVector.ShiftLeftByInt): String = {
-    s"({${e.shift}'d0,${emitExpression(e.source)}} <<< ${e.shift})"
+    s"({${e.shift}'d0,${emitExpression(e.source)}} <<< ${log2Up(e.shift+1)}'d${e.shift})"
   }
 
 
