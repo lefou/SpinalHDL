@@ -13,6 +13,7 @@ import scala.sys.process._
 
 abstract class SpinalTesterCocotbBase extends AnyFunSuite /* with BeforeAndAfterAll with ParallelTestExecution*/ {
   def workspaceRoot = "./cocotbWorkspace"
+  def sourceRoot = sys.env.getOrElse("MILL_WORKSPACE_ROOT", ".")
   def waveFolder = sys.env.getOrElse("WAVES_DIR", new File(workspaceRoot).getAbsolutePath)
   var withWaveform = false
   var spinalMustPass = true
@@ -87,7 +88,7 @@ abstract class SpinalTesterCocotbBase extends AnyFunSuite /* with BeforeAndAfter
 
   if(spinalMustPass) {
     val cocotbTests = ArrayBuffer[(String, String)]()
-    if (pythonTestLocation != null) cocotbTests += ("cocotb" -> pythonTestLocation)
+    if (pythonTestLocation != null) cocotbTests += ("cocotb" -> Seq(sourceRoot, pythonTestLocation).mkString("/"))
     cocotbTests ++= pythonTests
     for ((name, location) <- cocotbTests) {
       if(!noVhdl)
