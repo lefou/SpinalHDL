@@ -143,8 +143,16 @@ trait Tester extends SpinalModule with SpinalPublishModule {
     os.copy.over(sourcePath, destPath, createFolders = true)
   }
 
-  def testOnly(args: String*) = T.command {
-    copyPythonResources()
-    super.testOnly(args: _*)()
+  def testOnly(args: String*) = {
+    val (selector, testArgs) = args.indexOf("--") match {
+      case -1 => (args, Seq.empty)
+      case pos =>
+        val (s, t) = args.splitAt(pos)
+        (s, t.tail)
+    }
+    val argsTask = Task.Anon { copyPythonResources(); testArgs }
+    Task.Command {
+      testTask(argsTask, Task.Anon { selector })()
+    }
   }
 }
